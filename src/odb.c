@@ -5,13 +5,13 @@
  * a Linking Exception. For full terms see the included COPYING file.
  */
 
-#include "common.h"
+#include "odb.h"
+
 #include <zlib.h>
 #include "git2/object.h"
 #include "git2/sys/odb_backend.h"
 #include "fileops.h"
 #include "hash.h"
-#include "odb.h"
 #include "delta.h"
 #include "filter.h"
 #include "repository.h"
@@ -1002,7 +1002,7 @@ static int odb_read_1(git_odb_object **out, git_odb *db, const git_oid *id,
 	git_odb_object *object;
 	git_oid hashed;
 	bool found = false;
-	int error;
+	int error = 0;
 
 	if (!only_refreshed && odb_read_hardcoded(&raw, id) == 0)
 		found = true;
@@ -1099,7 +1099,7 @@ static int read_prefix_1(git_odb_object **out, git_odb *db,
 		const git_oid *key, size_t len, bool only_refreshed)
 {
 	size_t i;
-	int error;
+	int error = 0;
 	git_oid found_full_oid = {{0}};
 	git_rawobj raw = {0};
 	void *data = NULL;
@@ -1116,8 +1116,11 @@ static int read_prefix_1(git_odb_object **out, git_odb *db,
 		if (b->read_prefix != NULL) {
 			git_oid full_oid;
 			error = b->read_prefix(&full_oid, &raw.data, &raw.len, &raw.type, b, key, len);
-			if (error == GIT_ENOTFOUND || error == GIT_PASSTHROUGH)
+
+			if (error == GIT_ENOTFOUND || error == GIT_PASSTHROUGH) {
+				error = 0;
 				continue;
+			}
 
 			if (error)
 				goto out;
@@ -1326,9 +1329,9 @@ static int git_odb_stream__invalid_length(
 {
 	giterr_set(GITERR_ODB,
 		"cannot %s - "
-		"Invalid length. %"PRIuZ" was expected. The "
-		"total size of the received chunks amounts to %"PRIuZ".",
-		action, stream->declared_size, stream->received_bytes);		
+		"Invalid length. %"PRIdZ" was expected. The "
+		"total size of the received chunks amounts to %"PRIdZ".",
+		action, stream->declared_size, stream->received_bytes);
 
 	return -1;
 }

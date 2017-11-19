@@ -4,6 +4,9 @@
  * This file is part of libgit2, distributed under the GNU GPL v2 with
  * a Linking Exception. For full terms see the included COPYING file.
  */
+
+#include "common.h"
+
 #ifndef GIT_WINHTTP
 
 #include "git2.h"
@@ -15,9 +18,9 @@
 #include "smart.h"
 #include "auth.h"
 #include "auth_negotiate.h"
-#include "tls_stream.h"
-#include "socket_stream.h"
-#include "curl_stream.h"
+#include "streams/tls.h"
+#include "streams/socket.h"
+#include "streams/curl.h"
 
 git_http_auth_scheme auth_schemes[] = {
 	{ GIT_AUTHTYPE_NEGOTIATE, "Negotiate", GIT_CREDTYPE_DEFAULT, git_http_auth_negotiate },
@@ -575,6 +578,9 @@ static int apply_proxy_config(http_subtransport *t)
 		if ((error = git_remote__get_http_proxy(t->owner->owner, !!t->connection_data.use_ssl, &url)) < 0)
 			return error;
 
+		opts.credentials = t->owner->proxy.credentials;
+		opts.certificate_check = t->owner->proxy.certificate_check;
+		opts.payload = t->owner->proxy.payload;
 		opts.type = GIT_PROXY_SPECIFIED;
 		opts.url = url;
 		error = git_stream_set_proxy(t->io, &opts);
