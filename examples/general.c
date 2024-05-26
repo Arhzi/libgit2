@@ -31,10 +31,12 @@
  * Git Internals that you will need to know to work with Git at this level,
  * check out [Chapter 10][pg] of the Pro Git book.
  *
- * [lg]: http://libgit2.github.com
- * [ap]: http://libgit2.github.com/libgit2
+ * [lg]: https://libgit2.org
+ * [ap]: https://libgit2.org/libgit2
  * [pg]: https://git-scm.com/book/en/v2/Git-Internals-Plumbing-and-Porcelain
  */
+
+#include "common.h"
 
 /**
  * ### Includes
@@ -43,9 +45,7 @@
  * that you need.  It should be the only thing you need to include in order
  * to compile properly and get all the libgit2 API.
  */
-#include <git2.h>
-#include <stdio.h>
-#include <string.h>
+#include "git2.h"
 
 static void oid_parsing(git_oid *out);
 static void object_database(git_repository *repo, git_oid *oid);
@@ -66,7 +66,7 @@ static void config_files(const char *repo_path, git_repository *repo);
  */
 static void check_error(int error_code, const char *action)
 {
-	const git_error *error = giterr_last();
+	const git_error *error = git_error_last();
 	if (!error_code)
 		return;
 
@@ -76,12 +76,11 @@ static void check_error(int error_code, const char *action)
 	exit(1);
 }
 
-int main (int argc, char** argv)
+int lg2_general(git_repository *repo, int argc, char** argv)
 {
 	int error;
 	git_oid oid;
 	char *repo_path;
-	git_repository *repo;
 
 	/**
 	 * Initialize the library, this will set up any global state which libgit2 needs
@@ -98,7 +97,7 @@ int main (int argc, char** argv)
 	 *
 	 * (Try running this program against tests/resources/testrepo.git.)
 	 *
-	 * [me]: http://libgit2.github.com/libgit2/#HEAD/group/repository
+	 * [me]: https://libgit2.org/libgit2/#HEAD/group/repository
 	 */
 	repo_path = (argc > 1) ? argv[1] : "/opt/libgit2-test/.git";
 
@@ -130,7 +129,7 @@ int main (int argc, char** argv)
  */
 static void oid_parsing(git_oid *oid)
 {
-	char out[GIT_OID_HEXSZ+1];
+	char out[GIT_OID_SHA1_HEXSIZE+1];
 	char hex[] = "4a202b346bb0fb0db7eff3cffeb3c70babbd2045";
 
 	printf("*Hex to Raw*\n");
@@ -143,20 +142,21 @@ static void oid_parsing(git_oid *oid)
 	 * this throughout the example for storing the value of the current SHA
 	 * key we're working with.
 	 */
+#ifdef GIT_EXPERIMENTAL_SHA256
+	git_oid_fromstr(oid, hex, GIT_OID_SHA1);
+#else
 	git_oid_fromstr(oid, hex);
+#endif
 
-	// Once we've converted the string into the oid value, we can get the raw
-	// value of the SHA by accessing `oid.id`
-
-	// Next we will convert the 20 byte raw SHA1 value to a human readable 40
-	// char hex value.
-	printf("\n*Raw to Hex*\n");
-	out[GIT_OID_HEXSZ] = '\0';
-
-	/**
-	 * If you have a oid, you can easily get the hex value of the SHA as well.
+	/*
+	 * Once we've converted the string into the oid value, we can get the raw
+	 * value of the SHA by accessing `oid.id`
+	 *
+	 * Next we will convert the 20 byte raw SHA1 value to a human readable 40
+	 * char hex value.
 	 */
-	git_oid_fmt(out, oid);
+	printf("\n*Raw to Hex*\n");
+	out[GIT_OID_SHA1_HEXSIZE] = '\0';
 
 	/**
 	 * If you have a oid, you can easily get the hex value of the SHA as well.
@@ -173,17 +173,17 @@ static void oid_parsing(git_oid *oid)
  * working with raw objects, we'll need to get this structure from the
  * repository.
  *
- * [odb]: http://libgit2.github.com/libgit2/#HEAD/group/odb
+ * [odb]: https://libgit2.org/libgit2/#HEAD/group/odb
  */
 static void object_database(git_repository *repo, git_oid *oid)
 {
-	char oid_hex[GIT_OID_HEXSZ+1] = { 0 };
+	char oid_hex[GIT_OID_SHA1_HEXSIZE+1] = { 0 };
 	const unsigned char *data;
 	const char *str_type;
 	int error;
 	git_odb_object *obj;
 	git_odb *odb;
-	git_otype otype;
+	git_object_t otype;
 
 	git_repository_odb(&odb, repo);
 
@@ -239,7 +239,7 @@ static void object_database(git_repository *repo, git_oid *oid)
 	 * we'll write a new blob object that just contains a simple string.
 	 * Notice that we have to specify the object type as the `git_otype` enum.
 	 */
-	git_odb_write(oid, odb, "test data", sizeof("test data") - 1, GIT_OBJ_BLOB);
+	git_odb_write(oid, odb, "test data", sizeof("test data") - 1, GIT_OBJECT_BLOB);
 
 	/**
 	 * Now that we've written the object, we can check out what SHA1 was
@@ -262,7 +262,7 @@ static void object_database(git_repository *repo, git_oid *oid)
  * of them here.  You can read about the other ones in the [commit API
  * docs][cd].
  *
- * [cd]: http://libgit2.github.com/libgit2/#HEAD/group/commit
+ * [cd]: https://libgit2.org/libgit2/#HEAD/group/commit
  */
 static void commit_writing(git_repository *repo)
 {
@@ -270,7 +270,7 @@ static void commit_writing(git_repository *repo)
 	git_tree *tree;
 	git_commit *parent;
 	git_signature *author, *committer;
-	char oid_hex[GIT_OID_HEXSZ+1] = { 0 };
+	char oid_hex[GIT_OID_SHA1_HEXSIZE+1] = { 0 };
 
 	printf("\n*Commit Writing*\n");
 
@@ -291,9 +291,14 @@ static void commit_writing(git_repository *repo)
 	 * parents.  Here we're creating oid objects to create the commit with,
 	 * but you can also use
 	 */
+#ifdef GIT_EXPERIMENTAL_SHA256
+	git_oid_fromstr(&tree_id, "f60079018b664e4e79329a7ef9559c8d9e0378d1", GIT_OID_SHA1);
+	git_oid_fromstr(&parent_id, "5b5b025afb0b4c913b4c338a42934a3863bf3644", GIT_OID_SHA1);
+#else
 	git_oid_fromstr(&tree_id, "f60079018b664e4e79329a7ef9559c8d9e0378d1");
-	git_tree_lookup(&tree, repo, &tree_id);
 	git_oid_fromstr(&parent_id, "5b5b025afb0b4c913b4c338a42934a3863bf3644");
+#endif
+	git_tree_lookup(&tree, repo, &tree_id);
 	git_commit_lookup(&parent, repo, &parent_id);
 
 	/**
@@ -342,14 +347,14 @@ static void commit_writing(git_repository *repo)
  * data in the commit - the author (name, email, datetime), committer
  * (same), tree, message, encoding and parent(s).
  *
- * [pco]: http://libgit2.github.com/libgit2/#HEAD/group/commit
+ * [pco]: https://libgit2.org/libgit2/#HEAD/group/commit
  */
 static void commit_parsing(git_repository *repo)
 {
 	const git_signature *author, *cmtter;
 	git_commit *commit, *parent;
 	git_oid oid;
-	char oid_hex[GIT_OID_HEXSZ+1];
+	char oid_hex[GIT_OID_SHA1_HEXSIZE+1];
 	const char *message;
 	unsigned int parents, p;
 	int error;
@@ -357,7 +362,11 @@ static void commit_parsing(git_repository *repo)
 
 	printf("\n*Commit Parsing*\n");
 
+#ifdef GIT_EXPERIMENTAL_SHA256
+	git_oid_fromstr(&oid, "8496071c1b46c854b31185ea97743be6a8774479", GIT_OID_SHA1);
+#else
 	git_oid_fromstr(&oid, "8496071c1b46c854b31185ea97743be6a8774479");
+#endif
 
 	error = git_commit_lookup(&commit, repo, &oid);
 	check_error(error, "looking up commit");
@@ -409,12 +418,12 @@ static void commit_parsing(git_repository *repo)
  * functions very similarly to the commit lookup, parsing and creation
  * methods, since the objects themselves are very similar.
  *
- * [tm]: http://libgit2.github.com/libgit2/#HEAD/group/tag
+ * [tm]: https://libgit2.org/libgit2/#HEAD/group/tag
  */
 static void tag_parsing(git_repository *repo)
 {
 	git_commit *commit;
-	git_otype type;
+	git_object_t type;
 	git_tag *tag;
 	git_oid oid;
 	const char *name, *message;
@@ -426,7 +435,11 @@ static void tag_parsing(git_repository *repo)
 	 * We create an oid for the tag object if we know the SHA and look it up
 	 * the same way that we would a commit (or any other object).
 	 */
+#ifdef GIT_EXPERIMENTAL_SHA256
+	git_oid_fromstr(&oid, "b25fa35b38051e4ae45d4222e795f9df2e43f1d1", GIT_OID_SHA1);
+#else
 	git_oid_fromstr(&oid, "b25fa35b38051e4ae45d4222e795f9df2e43f1d1");
+#endif
 
 	error = git_tag_lookup(&tag, repo, &oid);
 	check_error(error, "looking up tag");
@@ -439,7 +452,7 @@ static void tag_parsing(git_repository *repo)
 	 */
 	git_tag_target((git_object **)&commit, tag);
 	name = git_tag_name(tag);		/* "test" */
-	type = git_tag_target_type(tag);	/* GIT_OBJ_COMMIT (otype enum) */
+	type = git_tag_target_type(tag);	/* GIT_OBJECT_COMMIT (object_t enum) */
 	message = git_tag_message(tag);		/* "tag message\n" */
 	printf("Tag Name: %s\nTag Type: %s\nTag Message: %s\n",
 		name, git_object_type2string(type), message);
@@ -459,7 +472,7 @@ static void tag_parsing(git_repository *repo)
  * object type in Git, but a useful structure for parsing and traversing
  * tree entries.
  *
- * [tp]: http://libgit2.github.com/libgit2/#HEAD/group/tree
+ * [tp]: https://libgit2.org/libgit2/#HEAD/group/tree
  */
 static void tree_parsing(git_repository *repo)
 {
@@ -474,7 +487,11 @@ static void tree_parsing(git_repository *repo)
 	/**
 	 * Create the oid and lookup the tree object just like the other objects.
 	 */
+#ifdef GIT_EXPERIMENTAL_SHA256
+	git_oid_fromstr(&oid, "f60079018b664e4e79329a7ef9559c8d9e0378d1", GIT_OID_SHA1);
+#else
 	git_oid_fromstr(&oid, "f60079018b664e4e79329a7ef9559c8d9e0378d1");
+#endif
 	git_tree_lookup(&tree, repo, &oid);
 
 	/**
@@ -519,7 +536,7 @@ static void tree_parsing(git_repository *repo)
  * from disk and writing it to the db and getting the oid back so you
  * don't have to do all those steps yourself.
  *
- * [ba]: http://libgit2.github.com/libgit2/#HEAD/group/blob
+ * [ba]: https://libgit2.org/libgit2/#HEAD/group/blob
  */
 static void blob_parsing(git_repository *repo)
 {
@@ -528,7 +545,11 @@ static void blob_parsing(git_repository *repo)
 
 	printf("\n*Blob Parsing*\n");
 
+#ifdef GIT_EXPERIMENTAL_SHA256
+	git_oid_fromstr(&oid, "1385f264afb75a56a5bec74243be9b367ba4ca08", GIT_OID_SHA1);
+#else
 	git_oid_fromstr(&oid, "1385f264afb75a56a5bec74243be9b367ba4ca08");
+#endif
 	git_blob_lookup(&blob, repo, &oid);
 
 	/**
@@ -557,7 +578,7 @@ static void blob_parsing(git_repository *repo)
  * that were ancestors of (reachable from) a given starting point.  This
  * can allow you to create `git log` type functionality.
  *
- * [rw]: http://libgit2.github.com/libgit2/#HEAD/group/revwalk
+ * [rw]: https://libgit2.org/libgit2/#HEAD/group/revwalk
  */
 static void revwalking(git_repository *repo)
 {
@@ -570,7 +591,11 @@ static void revwalking(git_repository *repo)
 
 	printf("\n*Revwalking*\n");
 
+#ifdef GIT_EXPERIMENTAL_SHA256
+	git_oid_fromstr(&oid, "5b5b025afb0b4c913b4c338a42934a3863bf3644", GIT_OID_SHA1);
+#else
 	git_oid_fromstr(&oid, "5b5b025afb0b4c913b4c338a42934a3863bf3644");
+#endif
 
 	/**
 	 * To use the revwalker, create a new walker, tell it how you want to sort
@@ -618,12 +643,12 @@ static void revwalking(git_repository *repo)
  * The [index file API][gi] allows you to read, traverse, update and write
  * the Git index file (sometimes thought of as the staging area).
  *
- * [gi]: http://libgit2.github.com/libgit2/#HEAD/group/index
+ * [gi]: https://libgit2.org/libgit2/#HEAD/group/index
  */
 static void index_walking(git_repository *repo)
 {
 	git_index *index;
-	unsigned int i, ecount;
+	size_t i, ecount;
 
 	printf("\n*Index Walking*\n");
 
@@ -662,7 +687,7 @@ static void index_walking(git_repository *repo)
  * references such as branches, tags and remote references (everything in
  * the .git/refs directory).
  *
- * [ref]: http://libgit2.github.com/libgit2/#HEAD/group/reference
+ * [ref]: https://libgit2.org/libgit2/#HEAD/group/reference
  */
 static void reference_listing(git_repository *repo)
 {
@@ -683,19 +708,19 @@ static void reference_listing(git_repository *repo)
 
 	for (i = 0; i < ref_list.count; ++i) {
 		git_reference *ref;
-		char oid_hex[GIT_OID_HEXSZ+1] = GIT_OID_HEX_ZERO;
+		char oid_hex[GIT_OID_SHA1_HEXSIZE+1] = GIT_OID_SHA1_HEXZERO;
 		const char *refname;
 
 		refname = ref_list.strings[i];
 		git_reference_lookup(&ref, repo, refname);
 
 		switch (git_reference_type(ref)) {
-			case GIT_REF_OID:
+			case GIT_REFERENCE_DIRECT:
 				git_oid_fmt(oid_hex, git_reference_target(ref));
 				printf("%s [%s]\n", refname, oid_hex);
 				break;
 
-			case GIT_REF_SYMBOLIC:
+			case GIT_REFERENCE_SYMBOLIC:
 				printf("%s => %s\n", refname, git_reference_symbolic_target(ref));
 				break;
 			default:
@@ -706,16 +731,16 @@ static void reference_listing(git_repository *repo)
 		git_reference_free(ref);
 	}
 
-	git_strarray_free(&ref_list);
+	git_strarray_dispose(&ref_list);
 }
 
 /**
  * ### Config Files
  *
- * The [config API][config] allows you to list and updatee config values
+ * The [config API][config] allows you to list and update config values
  * in any of the accessible config file locations (system, global, local).
  *
- * [config]: http://libgit2.github.com/libgit2/#HEAD/group/config
+ * [config]: https://libgit2.org/libgit2/#HEAD/group/config
  */
 static void config_files(const char *repo_path, git_repository* repo)
 {

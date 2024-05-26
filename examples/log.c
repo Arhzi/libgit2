@@ -50,6 +50,7 @@ static int add_revision(struct log_state *s, const char *revstr);
 /** log_options holds other command line options that affect log output */
 struct log_options {
 	int show_diff;
+	int show_oneline;
 	int show_log_size;
 	int skip, limit;
 	int min_parents, max_parents;
@@ -71,7 +72,7 @@ static int match_with_parent(git_commit *commit, int i, git_diff_options *);
 static int signature_matches(const git_signature *sig, const char *filter);
 static int log_message_matches(const git_commit *commit, const char *filter);
 
-int main(int argc, char *argv[])
+int lg2_log(git_repository *repo, int argc, char *argv[])
 {
 	int i, count = 0, printed = 0, parents, last_arg;
 	struct log_state s;
@@ -81,10 +82,10 @@ int main(int argc, char *argv[])
 	git_commit *commit = NULL;
 	git_pathspec *ps = NULL;
 
-	git_libgit2_init();
+	memset(&s, 0, sizeof(s));
 
 	/** Parse arguments and set up revwalker. */
-
+	s.repo = repo;
 	last_arg = parse_options(&s, &opt, argc, argv);
 
 	diffopts.pathspec.strings = &argv[last_arg];
@@ -180,8 +181,6 @@ int main(int argc, char *argv[])
 
 	git_pathspec_free(ps);
 	git_revwalk_free(s.walker);
-	git_repository_free(s.repo);
-	git_libgit2_shutdown();
 
 	return 0;
 }
@@ -243,20 +242,13 @@ static int add_revision(struct log_state *s, const char *revstr)
 	git_revspec revs;
 	int hide = 0;
 
-	/** Open repo on demand if it isn't already open. */
-	if (!s->repo) {
-		if (!s->repodir) s->repodir = ".";
-		check_lg2(git_repository_open_ext(&s->repo, s->repodir, 0, NULL),
-			"Could not open repository", s->repodir);
-	}
-
 	if (!revstr) {
 		push_rev(s, NULL, hide);
 		return 0;
 	}
 
 	if (*revstr == '^') {
-		revs.flags = GIT_REVPARSE_SINGLE;
+		revs.flags = GIT_REVSPEC_SINGLE;
 		hide = !hide;
 
 		if (git_revparse_single(&revs.from, s->repo, revstr + 1) < 0)
@@ -264,18 +256,18 @@ static int add_revision(struct log_state *s, const char *revstr)
 	} else if (git_revparse(&revs, s->repo, revstr) < 0)
 		return -1;
 
-	if ((revs.flags & GIT_REVPARSE_SINGLE) != 0)
+	if ((revs.flags & GIT_REVSPEC_SINGLE) != 0)
 		push_rev(s, revs.from, hide);
 	else {
 		push_rev(s, revs.to, hide);
 
-		if ((revs.flags & GIT_REVPARSE_MERGE_BASE) != 0) {
+		if ((revs.flags & GIT_REVSPEC_MERGE_BASE) != 0) {
 			git_oid base;
 			check_lg2(git_merge_base(&base, s->repo,
 				git_object_id(revs.from), git_object_id(revs.to)),
 				"Could not find merge base", revstr);
 			check_lg2(
-				git_object_lookup(&revs.to, s->repo, &base, GIT_OBJ_COMMIT),
+				git_object_lookup(&revs.to, s->repo, &base, GIT_OBJECT_COMMIT),
 				"Could not find merge base commit", NULL);
 
 			push_rev(s, revs.to, hide);
@@ -340,40 +332,51 @@ static void print_time(const git_time *intime, const char *prefix)
 /** Helper to print a commit object. */
 static void print_commit(git_commit *commit, struct log_options *opts)
 {
-	char buf[GIT_OID_HEXSZ + 1];
+	char buf[GIT_OID_SHA1_HEXSIZE + 1];
 	int i, count;
 	const git_signature *sig;
 	const char *scan, *eol;
 
 	git_oid_tostr(buf, sizeof(buf), git_commit_id(commit));
-	printf("commit %s\n", buf);
 
-	if (opts->show_log_size) {
-		printf("log size %d\n", (int)strlen(git_commit_message(commit)));
-	}
+	if (opts->show_oneline) {
+		printf("%s ", buf);
+	} else {
+		printf("commit %s\n", buf);
 
-	if ((count = (int)git_commit_parentcount(commit)) > 1) {
-		printf("Merge:");
-		for (i = 0; i < count; ++i) {
-			git_oid_tostr(buf, 8, git_commit_parent_id(commit, i));
-			printf(" %s", buf);
+		if (opts->show_log_size) {
+			printf("log size %d\n", (int)strlen(git_commit_message(commit)));
+		}
+
+		if ((count = (int)git_commit_parentcount(commit)) > 1) {
+			printf("Merge:");
+			for (i = 0; i < count; ++i) {
+				git_oid_tostr(buf, 8, git_commit_parent_id(commit, i));
+				printf(" %s", buf);
+			}
+			printf("\n");
+		}
+
+		if ((sig = git_commit_author(commit)) != NULL) {
+			printf("Author: %s <%s>\n", sig->name, sig->email);
+			print_time(&sig->when, "Date:   ");
 		}
 		printf("\n");
 	}
 
-	if ((sig = git_commit_author(commit)) != NULL) {
-		printf("Author: %s <%s>\n", sig->name, sig->email);
-		print_time(&sig->when, "Date:   ");
-	}
-	printf("\n");
-
 	for (scan = git_commit_message(commit); scan && *scan; ) {
 		for (eol = scan; *eol && *eol != '\n'; ++eol) /* find eol */;
 
-		printf("    %.*s\n", (int)(eol - scan), scan);
+		if (opts->show_oneline)
+			printf("%.*s\n", (int)(eol - scan), scan);
+		else
+			printf("    %.*s\n", (int)(eol - scan), scan);
 		scan = *eol ? eol + 1 : NULL;
+		if (opts->show_oneline)
+			break;
 	}
-	printf("\n");
+	if (!opts->show_oneline)
+		printf("\n");
 }
 
 /** Helper to find how many files in a commit changed from its nth parent. */
@@ -418,8 +421,6 @@ static int parse_options(
 	struct log_state *s, struct log_options *opt, int argc, char **argv)
 {
 	struct args_info args = ARGS_INFO_INIT;
-
-	memset(s, 0, sizeof(*s));
 	s->sorting = GIT_SORT_TIME;
 
 	memset(opt, 0, sizeof(*opt));
@@ -435,8 +436,7 @@ static int parse_options(
 			else
 				/** Try failed revision parse as filename. */
 				break;
-		} else if (!strcmp(a, "--")) {
-			++args.pos;
+		} else if (match_arg_separator(&args)) {
 			break;
 		}
 		else if (!strcmp(a, "--date-order"))
@@ -446,21 +446,28 @@ static int parse_options(
 		else if (!strcmp(a, "--reverse"))
 			set_sorting(s, GIT_SORT_REVERSE);
 		else if (match_str_arg(&opt->author, &args, "--author"))
-			/** Found valid --author */;
+			/** Found valid --author */
+			;
 		else if (match_str_arg(&opt->committer, &args, "--committer"))
-			/** Found valid --committer */;
+			/** Found valid --committer */
+			;
 		else if (match_str_arg(&opt->grep, &args, "--grep"))
-			/** Found valid --grep */;
+			/** Found valid --grep */
+			;
 		else if (match_str_arg(&s->repodir, &args, "--git-dir"))
-			/** Found git-dir. */;
+			/** Found git-dir. */
+			;
 		else if (match_int_arg(&opt->skip, &args, "--skip", 0))
-			/** Found valid --skip. */;
+			/** Found valid --skip. */
+			;
 		else if (match_int_arg(&opt->limit, &args, "--max-count", 0))
-			/** Found valid --max-count. */;
+			/** Found valid --max-count. */
+			;
 		else if (a[1] >= '0' && a[1] <= '9')
 			is_integer(&opt->limit, a + 1, 0);
 		else if (match_int_arg(&opt->limit, &args, "-n", 0))
-			/** Found valid -n. */;
+			/** Found valid -n. */
+			;
 		else if (!strcmp(a, "--merges"))
 			opt->min_parents = 2;
 		else if (!strcmp(a, "--no-merges"))
@@ -470,13 +477,17 @@ static int parse_options(
 		else if (!strcmp(a, "--no-max-parents"))
 			opt->max_parents = -1;
 		else if (match_int_arg(&opt->max_parents, &args, "--max-parents=", 1))
-			/** Found valid --max-parents. */;
+			/** Found valid --max-parents. */
+			;
 		else if (match_int_arg(&opt->min_parents, &args, "--min-parents=", 0))
-			/** Found valid --min_parents. */;
+			/** Found valid --min_parents. */
+			;
 		else if (!strcmp(a, "-p") || !strcmp(a, "-u") || !strcmp(a, "--patch"))
 			opt->show_diff = 1;
 		else if (!strcmp(a, "--log-size"))
 			opt->show_log_size = 1;
+		else if (!strcmp(a, "--oneline"))
+			opt->show_oneline = 1;
 		else
 			usage("Unsupported argument", a);
 	}

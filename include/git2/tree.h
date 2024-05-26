@@ -189,7 +189,7 @@ GIT_EXTERN(const git_oid *) git_tree_entry_id(const git_tree_entry *entry);
  * @param entry a tree entry
  * @return the type of the pointed object
  */
-GIT_EXTERN(git_otype) git_tree_entry_type(const git_tree_entry *entry);
+GIT_EXTERN(git_object_t) git_tree_entry_type(const git_tree_entry *entry);
 
 /**
  * Get the UNIX file attributes of a tree entry
@@ -255,11 +255,12 @@ GIT_EXTERN(int) git_treebuilder_new(
 	git_treebuilder **out, git_repository *repo, const git_tree *source);
 
 /**
- * Clear all the entires in the builder
+ * Clear all the entries in the builder
  *
  * @param bld Builder to clear
+ * @return 0 on success; error code otherwise
  */
-GIT_EXTERN(void) git_treebuilder_clear(git_treebuilder *bld);
+GIT_EXTERN(int) git_treebuilder_clear(git_treebuilder *bld);
 
 /**
  * Get the number of entries listed in a treebuilder
@@ -267,7 +268,7 @@ GIT_EXTERN(void) git_treebuilder_clear(git_treebuilder *bld);
  * @param bld a previously loaded treebuilder.
  * @return the number of entries in the treebuilder
  */
-GIT_EXTERN(unsigned int) git_treebuilder_entrycount(git_treebuilder *bld);
+GIT_EXTERN(size_t) git_treebuilder_entrycount(git_treebuilder *bld);
 
 /**
  * Free a tree builder
@@ -307,9 +308,10 @@ GIT_EXTERN(const git_tree_entry *) git_treebuilder_get(
  * pointer may not be valid past the next operation in this
  * builder. Duplicate the entry if you want to keep it.
  *
- * No attempt is being made to ensure that the provided oid points
- * to an existing git object in the object database, nor that the
- * attributes make sense regarding the type of the pointed at object.
+ * By default the entry that you are inserting will be checked for
+ * validity; that it exists in the object database and is of the
+ * correct type.  If you do not want this behavior, set the
+ * `GIT_OPT_ENABLE_STRICT_OBJECT_CREATION` library option to false.
  *
  * @param out Pointer to store the entry (optional)
  * @param bld Tree builder
@@ -332,6 +334,7 @@ GIT_EXTERN(int) git_treebuilder_insert(
  *
  * @param bld Tree builder
  * @param filename Filename of the entry to remove
+ * @return 0 or an error code
  */
 GIT_EXTERN(int) git_treebuilder_remove(
 	git_treebuilder *bld, const char *filename);
@@ -343,7 +346,7 @@ GIT_EXTERN(int) git_treebuilder_remove(
  * entry should be left alone and any non-zero value meaning that the
  * entry should be removed from the treebuilder list (i.e. filtered out).
  */
-typedef int (*git_treebuilder_filter_cb)(
+typedef int GIT_CALLBACK(git_treebuilder_filter_cb)(
 	const git_tree_entry *entry, void *payload);
 
 /**
@@ -356,8 +359,9 @@ typedef int (*git_treebuilder_filter_cb)(
  * @param bld Tree builder
  * @param filter Callback to filter entries
  * @param payload Extra data to pass to filter callback
+ * @return 0 on success, non-zero callback return value, or error code
  */
-GIT_EXTERN(void) git_treebuilder_filter(
+GIT_EXTERN(int) git_treebuilder_filter(
 	git_treebuilder *bld,
 	git_treebuilder_filter_cb filter,
 	void *payload);
@@ -375,28 +379,14 @@ GIT_EXTERN(void) git_treebuilder_filter(
 GIT_EXTERN(int) git_treebuilder_write(
 	git_oid *id, git_treebuilder *bld);
 
-/**
- * Write the contents of the tree builder as a tree object
- * using a shared git_buf.
- *
- * @see git_treebuilder_write
- *
- * @param oid Pointer to store the OID of the newly written tree
- * @param bld Tree builder to write
- * @param tree Shared buffer for writing the tree. Will be grown as necessary.
- * @return 0 or an error code
- */
-GIT_EXTERN(int) git_treebuilder_write_with_buffer(
-	git_oid *oid, git_treebuilder *bld, git_buf *tree);
-
 /** Callback for the tree traversal method */
-typedef int (*git_treewalk_cb)(
+typedef int GIT_CALLBACK(git_treewalk_cb)(
 	const char *root, const git_tree_entry *entry, void *payload);
 
 /** Tree traversal modes */
 typedef enum {
 	GIT_TREEWALK_PRE = 0, /* Pre-order */
-	GIT_TREEWALK_POST = 1, /* Post-order */
+	GIT_TREEWALK_POST = 1 /* Post-order */
 } git_treewalk_mode;
 
 /**
@@ -428,6 +418,7 @@ GIT_EXTERN(int) git_tree_walk(
  *
  * @param out Pointer to store the copy of the tree
  * @param source Original tree to copy
+ * @return 0
  */
 GIT_EXTERN(int) git_tree_dup(git_tree **out, git_tree *source);
 
@@ -438,7 +429,7 @@ typedef enum {
 	/** Update or insert an entry at the specified path */
 	GIT_TREE_UPDATE_UPSERT,
 	/** Remove an entry from the specified path */
-	GIT_TREE_UPDATE_REMOVE,
+	GIT_TREE_UPDATE_REMOVE
 } git_tree_update_t;
 
 /**
@@ -474,6 +465,7 @@ typedef struct {
  * @param baseline the tree to base these changes on
  * @param nupdates the number of elements in the update list
  * @param updates the list of updates to perform
+ * @return 0 or an error code
  */
 GIT_EXTERN(int) git_tree_create_updated(git_oid *out, git_repository *repo, git_tree *baseline, size_t nupdates, const git_tree_update *updates);
 

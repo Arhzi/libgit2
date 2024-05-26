@@ -39,12 +39,12 @@ struct git_config_iterator {
 	 * Return the current entry and advance the iterator. The
 	 * memory belongs to the library.
 	 */
-	int (*next)(git_config_entry **entry, git_config_iterator *iter);
+	int GIT_CALLBACK(next)(git_config_entry **entry, git_config_iterator *iter);
 
 	/**
 	 * Free the iterator
 	 */
-	void (*free)(git_config_iterator *iter);
+	void GIT_CALLBACK(free)(git_config_iterator *iter);
 };
 
 /**
@@ -58,15 +58,15 @@ struct git_config_backend {
 	struct git_config *cfg;
 
 	/* Open means open the file/database and parse if necessary */
-	int (*open)(struct git_config_backend *, git_config_level_t level, const git_repository *repo);
-	int (*get)(struct git_config_backend *, const char *key, git_config_entry **entry);
-	int (*set)(struct git_config_backend *, const char *key, const char *value);
-	int (*set_multivar)(git_config_backend *cfg, const char *name, const char *regexp, const char *value);
-	int (*del)(struct git_config_backend *, const char *key);
-	int (*del_multivar)(struct git_config_backend *, const char *key, const char *regexp);
-	int (*iterator)(git_config_iterator **, struct git_config_backend *);
+	int GIT_CALLBACK(open)(struct git_config_backend *, git_config_level_t level, const git_repository *repo);
+	int GIT_CALLBACK(get)(struct git_config_backend *, const char *key, git_config_entry **entry);
+	int GIT_CALLBACK(set)(struct git_config_backend *, const char *key, const char *value);
+	int GIT_CALLBACK(set_multivar)(git_config_backend *cfg, const char *name, const char *regexp, const char *value);
+	int GIT_CALLBACK(del)(struct git_config_backend *, const char *key);
+	int GIT_CALLBACK(del_multivar)(struct git_config_backend *, const char *key, const char *regexp);
+	int GIT_CALLBACK(iterator)(git_config_iterator **, struct git_config_backend *);
 	/** Produce a read-only version of this backend */
-	int (*snapshot)(struct git_config_backend **, struct git_config_backend *);
+	int GIT_CALLBACK(snapshot)(struct git_config_backend **, struct git_config_backend *);
 	/**
 	 * Lock this backend.
 	 *
@@ -74,14 +74,14 @@ struct git_config_backend {
 	 * backend. Any updates must not be visible to any other
 	 * readers.
 	 */
-	int (*lock)(struct git_config_backend *);
+	int GIT_CALLBACK(lock)(struct git_config_backend *);
 	/**
 	 * Unlock the data store backing this backend. If success is
 	 * true, the changes should be committed, otherwise rolled
 	 * back.
 	 */
-	int (*unlock)(struct git_config_backend *, int success);
-	void (*free)(struct git_config_backend *);
+	int GIT_CALLBACK(unlock)(struct git_config_backend *, int success);
+	void GIT_CALLBACK(free)(struct git_config_backend *);
 };
 #define GIT_CONFIG_BACKEND_VERSION 1
 #define GIT_CONFIG_BACKEND_INIT {GIT_CONFIG_BACKEND_VERSION}
@@ -124,6 +124,57 @@ GIT_EXTERN(int) git_config_add_backend(
 	git_config_level_t level,
 	const git_repository *repo,
 	int force);
+
+/** Options for in-memory configuration backends. */
+typedef struct {
+	unsigned int version;
+
+	/**
+	 * The type of this backend (eg, "command line"). If this is
+	 * NULL, then this will be "in-memory".
+	 */
+	const char *backend_type;
+
+	/**
+	 * The path to the origin; if this is NULL then it will be
+	 * left unset in the resulting configuration entries.
+	 */
+	const char *origin_path;
+} git_config_backend_memory_options;
+
+#define GIT_CONFIG_BACKEND_MEMORY_OPTIONS_VERSION 1
+#define GIT_CONFIG_BACKEND_MEMORY_OPTIONS_INIT { GIT_CONFIG_BACKEND_MEMORY_OPTIONS_VERSION }
+
+
+/**
+ * Create an in-memory configuration backend from a string in standard
+ * git configuration file format.
+ *
+ * @param out the new backend
+ * @param cfg the configuration that is to be parsed
+ * @param len the length of the string pointed to by `cfg`
+ * @param opts the options to initialize this backend with, or NULL
+ */
+extern int git_config_backend_from_string(
+	git_config_backend **out,
+	const char *cfg,
+	size_t len,
+	git_config_backend_memory_options *opts);
+
+/**
+ * Create an in-memory configuration backend from a list of name/value
+ * pairs.
+ *
+ * @param out the new backend
+ * @param values the configuration values to set (in "key=value" format)
+ * @param len the length of the values array
+ * @param opts the options to initialize this backend with, or NULL
+ */
+extern int git_config_backend_from_values(
+	git_config_backend **out,
+	const char **values,
+	size_t len,
+	git_config_backend_memory_options *opts);
 
 /** @} */
 GIT_END_DECL

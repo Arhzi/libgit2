@@ -1,19 +1,18 @@
-LINK_DIRECTORIES(${LIBGIT2_LIBDIRS})
-INCLUDE_DIRECTORIES(${LIBGIT2_INCLUDES})
+# examples: code usage examples of libgit2
 
-FILE(GLOB_RECURSE SRC_EXAMPLE_GIT2 network/*.c network/*.h)
-ADD_EXECUTABLE(cgit2 ${SRC_EXAMPLE_GIT2})
-IF(WIN32 OR ANDROID)
-	TARGET_LINK_LIBRARIES(cgit2 git2)
-ELSE()
-	TARGET_LINK_LIBRARIES(cgit2 git2 pthread)
-ENDIF()
+file(GLOB SRC_EXAMPLES *.c *.h)
 
-FILE(GLOB SRC_EXAMPLE_APPS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} *.c)
-FOREACH(src_app ${SRC_EXAMPLE_APPS})
-	STRING(REPLACE ".c" "" app_name ${src_app})
-	IF(NOT ${app_name} STREQUAL "common")
-		ADD_EXECUTABLE(${app_name} ${src_app} "common.c")
-		TARGET_LINK_LIBRARIES(${app_name} git2)
-	ENDIF()
-ENDFOREACH()
+add_executable(lg2 ${SRC_EXAMPLES})
+set_target_properties(lg2 PROPERTIES C_STANDARD 90)
+
+# Ensure that we do not use deprecated functions internally
+add_definitions(-DGIT_DEPRECATE_HARD)
+
+target_include_directories(lg2 PRIVATE ${LIBGIT2_INCLUDES} ${LIBGIT2_DEPENDENCY_INCLUDES})
+target_include_directories(lg2 SYSTEM PRIVATE ${LIBGIT2_SYSTEM_INCLUDES})
+
+if(WIN32 OR ANDROID)
+	target_link_libraries(lg2 libgit2package)
+else()
+	target_link_libraries(lg2 libgit2package pthread)
+endif()

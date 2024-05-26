@@ -49,7 +49,7 @@ typedef enum {
 	 * Bypass the git-aware transport, but do not try to use
 	 * hardlinks.
 	 */
-	GIT_CLONE_LOCAL_NO_LINKS,
+	GIT_CLONE_LOCAL_NO_LINKS
 } git_clone_local_t;
 
 /**
@@ -66,7 +66,7 @@ typedef enum {
  * @param payload an opaque payload
  * @return 0, GIT_EINVALIDSPEC, GIT_EEXISTS or an error code
  */
-typedef int (*git_remote_create_cb)(
+typedef int GIT_CALLBACK(git_remote_create_cb)(
 	git_remote **out,
 	git_repository *repo,
 	const char *name,
@@ -74,8 +74,8 @@ typedef int (*git_remote_create_cb)(
 	void *payload);
 
 /**
- * The signature of a function matchin git_repository_init, with an
- * aditional void * as callback payload.
+ * The signature of a function matching git_repository_init, with an
+ * additional void * as callback payload.
  *
  * Callers of git_clone my provide a function matching this signature
  * to override the repository creation and customization process
@@ -87,7 +87,7 @@ typedef int (*git_remote_create_cb)(
  * @param payload payload specified by the options
  * @return 0, or a negative value to indicate error
  */
-typedef int (*git_repository_create_cb)(
+typedef int GIT_CALLBACK(git_repository_create_cb)(
 	git_repository **out,
 	const char *path,
 	int bare,
@@ -96,9 +96,9 @@ typedef int (*git_repository_create_cb)(
 /**
  * Clone options structure
  *
- * Use the GIT_CLONE_OPTIONS_INIT to get the default settings, like this:
+ * Initialize with `GIT_CLONE_OPTIONS_INIT`. Alternatively, you can
+ * use `git_clone_options_init`.
  *
- *		git_clone_options opts = GIT_CLONE_OPTIONS_INIT;
  */
 typedef struct git_clone_options {
 	unsigned int version;
@@ -133,7 +133,7 @@ typedef struct git_clone_options {
 	 * The name of the branch to checkout. NULL means use the
 	 * remote's default branch.
 	 */
-	const char* checkout_branch;
+	const char *checkout_branch;
 
 	/**
 	 * A callback used to create the new repository into which to
@@ -169,14 +169,16 @@ typedef struct git_clone_options {
 	GIT_FETCH_OPTIONS_INIT }
 
 /**
- * Initializes a `git_clone_options` with default values. Equivalent to
- * creating an instance with GIT_CLONE_OPTIONS_INIT.
+ * Initialize git_clone_options structure
  *
- * @param opts The `git_clone_options` struct to initialize
- * @param version Version of struct; pass `GIT_CLONE_OPTIONS_VERSION`
+ * Initializes a `git_clone_options` with default values. Equivalent to creating
+ * an instance with GIT_CLONE_OPTIONS_INIT.
+ *
+ * @param opts The `git_clone_options` struct to initialize.
+ * @param version The struct version; pass `GIT_CLONE_OPTIONS_VERSION`.
  * @return Zero on success; -1 on failure.
  */
-GIT_EXTERN(int) git_clone_init_options(
+GIT_EXTERN(int) git_clone_options_init(
 	git_clone_options *opts,
 	unsigned int version);
 
@@ -194,7 +196,7 @@ GIT_EXTERN(int) git_clone_init_options(
  *        function works as though GIT_OPTIONS_INIT were passed.
  * @return 0 on success, any non-zero return value from a callback
  *         function, or a negative value to indicate an error (use
- *         `giterr_last` for a detailed error message)
+ *         `git_error_last` for a detailed error message)
  */
 GIT_EXTERN(int) git_clone(
 	git_repository **out,

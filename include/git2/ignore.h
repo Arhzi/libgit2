@@ -29,7 +29,7 @@ GIT_BEGIN_DECL
  * This would add three rules to the ignores.
  *
  * @param repo The repository to add ignore rules to.
- * @param rules Text of rules, a la the contents of a .gitignore file.
+ * @param rules Text of rules, the contents to add on a .gitignore file.
  *              It is okay to have multiple rules in the text; if so,
  *              each rule should be terminated with a newline.
  * @return 0 on success
@@ -59,8 +59,8 @@ GIT_EXTERN(int) git_ignore_clear_internal_rules(
  * given file.  This indicates if the file would be ignored regardless of
  * whether the file is already in the index or committed to the repository.
  *
- * One way to think of this is if you were to do "git add ." on the
- * directory containing the file, would it be added or not?
+ * One way to think of this is if you were to do "git check-ignore --no-index"
+ * on the given file, would it be shown or not?
  *
  * @param ignored boolean returning 0 if the file is not ignored, 1 if it is
  * @param repo a repository object
