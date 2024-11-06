@@ -42,7 +42,7 @@ jobs:
             name: noble
           env:
             CC: clang
-            CMAKE_OPTIONS: -DUSE_HTTPS=mbedTLS -DUSE_SHA1=HTTPS -DREGEX_BACKEND=pcre -DDEPRECATE_HARD=ON -DUSE_LEAK_CHECKER=valgrind -DUSE_GSSAPI=ON -DUSE_SSH=exec
+            CMAKE_OPTIONS: -DUSE_HTTPS=mbedTLS -DUSE_SHA1=HTTPS -DREGEX_BACKEND=pcre -DDEPRECATE_HARD=ON -DUSE_LEAK_CHECKER=valgrind -DUSE_GSSAPI=ON -DUSE_SSH=exec -DUSE_HTTP_PARSER=http-parser
             CMAKE_GENERATOR: Ninja
         - name: "Linux (Xenial, GCC, OpenSSL, OpenSSH)"
           id: xenial-gcc-openssl
@@ -132,7 +132,7 @@ jobs:
           env:
             CC: clang
             CFLAGS: -fsanitize=memory -fsanitize-memory-track-origins=2 -fsanitize-blacklist=/home/libgit2/source/script/sanitizers.supp -fno-optimize-sibling-calls -fno-omit-frame-pointer
-            CMAKE_OPTIONS: -DCMAKE_PREFIX_PATH=/usr/local/msan -DUSE_HTTPS=mbedTLS -DUSE_SHA1=HTTPS -DREGEX_BACKEND=pcre -DDEPRECATE_HARD=ON -DUSE_BUNDLED_ZLIB=ON -DUSE_SSH=ON
+            CMAKE_OPTIONS: -DCMAKE_C_EXTENSIONS=ON -DCMAKE_PREFIX_PATH=/usr/local/msan -DUSE_HTTPS=mbedTLS -DUSE_SHA1=HTTPS -DREGEX_BACKEND=pcre -DDEPRECATE_HARD=ON -DUSE_BUNDLED_ZLIB=ON -DUSE_SSH=ON
             CMAKE_GENERATOR: Ninja
             SKIP_SSH_TESTS: true
             SKIP_NEGOTIATE_TESTS: true
